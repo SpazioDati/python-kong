@@ -10,7 +10,8 @@ import backoff
 from requests.adapters import HTTPAdapter
 
 from .contract import KongAdminContract, APIAdminContract, ConsumerAdminContract, PluginAdminContract, \
-    APIPluginConfigurationAdminContract, BasicAuthAdminContract, KeyAuthAdminContract, OAuth2AdminContract
+    APIPluginConfigurationAdminContract, BasicAuthAdminContract, KeyAuthAdminContract, OAuth2AdminContract, \
+    AclAdminContract
 from .utils import add_url_params, assert_dict_keys_in, ensure_trailing_slash
 from .compat import OK, CREATED, NO_CONTENT, NOT_FOUND, CONFLICT, INTERNAL_SERVER_ERROR, urljoin
 from .exceptions import ConflictError, ServerError
@@ -717,6 +718,124 @@ class OAuth2AdminClient(OAuth2AdminContract, RestClient):
         return result
 
 
+class AclAdminClient(AclAdminContract, RestClient):
+    def __init__(self, consumer_admin, consumer_id, api_url):
+        super(AclAdminClient, self).__init__(api_url, headers=get_default_kong_headers())
+
+        self.consumer_admin = consumer_admin
+        self.consumer_id = consumer_id
+
+    def destroy(self):
+        super(AclAdminClient, self).destroy()
+        self.consumer_admin = None
+        self.consumer_id = None
+
+    def create_or_update(self, acl_id=None, group=None):
+        data = {
+            'group': group,
+        }
+
+        if acl_id is not None:
+            data['id'] = acl_id
+
+        response = self.session.put(self.get_url('consumers', self.consumer_id, 'acls'), data=data,
+                                    headers=self.get_headers())
+        result = response.json()
+        if response.status_code == CONFLICT:
+            raise_response_error(response, ConflictError)
+        elif response.status_code == INTERNAL_SERVER_ERROR:
+            raise_response_error(response, ServerError)
+        elif response.status_code not in (CREATED, OK):
+            raise_response_error(response, ValueError)
+
+        return result
+
+    def create(self, group):
+        response = self.session.post(self.get_url('consumers', self.consumer_id, 'acls'), data={
+            'group': group,
+        }, headers=self.get_headers())
+        result = response.json()
+        if response.status_code == CONFLICT:
+            raise_response_error(response, ConflictError)
+        elif response.status_code == INTERNAL_SERVER_ERROR:
+            raise_response_error(response, ServerError)
+        elif response.status_code != CREATED:
+            raise_response_error(response, ValueError)
+
+        return result
+
+    @backoff.on_exception(backoff.expo, ServerError, max_tries=3)
+    def list(self, size=100, offset=None, **filter_fields):
+        assert_dict_keys_in(filter_fields, ['id', 'group'])
+
+        query_params = filter_fields
+        query_params['size'] = size
+
+        if offset:
+            query_params['offset'] = offset
+
+        url = self.get_url('consumers', self.consumer_id, 'acls', **query_params)
+        response = self.session.get(url, headers=self.get_headers())
+        result = response.json()
+
+        if response.status_code == INTERNAL_SERVER_ERROR:
+            raise_response_error(response, ServerError)
+        elif response.status_code != OK:
+            raise_response_error(response, ValueError)
+
+        return result
+
+    @backoff.on_exception(backoff.expo, ValueError, max_tries=3)
+    def delete(self, acl_id):
+        url = self.get_url('consumers', self.consumer_id, 'acls', acl_id)
+        response = self.session.delete(url, headers=self.get_headers())
+
+        if response.status_code not in (NO_CONTENT, NOT_FOUND):
+            raise ValueError('Could not delete Acl (status: %s): %s for Consumer: %s' % (
+                response.status_code, acl_id, self.consumer_id))
+
+    @backoff.on_exception(backoff.expo, ServerError, max_tries=3)
+    def retrieve(self, acl_id):
+        response = self.session.get(self.get_url('consumers', self.consumer_id, 'acls', acl_id),
+                                    headers=self.get_headers())
+        result = response.json()
+
+        if response.status_code == INTERNAL_SERVER_ERROR:
+            raise_response_error(response, ServerError)
+        elif response.status_code != OK:
+            raise_response_error(response, ValueError)
+
+        return result
+
+    @backoff.on_exception(backoff.expo, ServerError, max_tries=3)
+    def count(self):
+        response = self.session.get(self.get_url('consumers', self.consumer_id, 'acls'),
+                                    headers=self.get_headers())
+
+        if response.status_code == INTERNAL_SERVER_ERROR:
+            raise_response_error(response, ServerError)
+        elif response.status_code != OK:
+            raise_response_error(response, ValueError)
+
+        result = response.json()
+        amount = result.get('total', len(result.get('data')))
+        return amount
+
+    def update(self, acl_id, **fields):
+        assert_dict_keys_in(fields, ['group'])
+        response = self.session.patch(
+            self.get_url('consumers', self.consumer_id, 'acls', acl_id), data=fields,
+            headers=self.get_headers())
+        result = response.json()
+
+        if response.status_code == INTERNAL_SERVER_ERROR:
+            raise_response_error(response, ServerError)
+        elif response.status_code != OK:
+            raise_response_error(response, ValueError)
+
+        return result
+
+
 class ConsumerAdminClient(ConsumerAdminContract, RestClient):
     def __init__(self, api_url):
         super(ConsumerAdminClient, self).__init__(api_url, headers=get_default_kong_headers())
@@ -831,6 +950,9 @@ class ConsumerAdminClient(ConsumerAdminContract, RestClient):
 
     def oauth2(self, username_or_id):
         return OAuth2AdminClient(self, username_or_id, self.api_url)
+
+    def acl(self, username_or_id):
+        return AclAdminClient(self, username_or_id, self.api_url)
 
 
 class PluginAdminClient(PluginAdminContract, RestClient):

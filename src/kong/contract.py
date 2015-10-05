@@ -721,6 +721,123 @@ class OAuth2AdminContract(CollectionMixin):
         """
 
 
+class AclAdminContract(CollectionMixin):
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def destroy(self):
+        """
+        Releases all references, closes open connections, ...
+        """
+
+    @abstractmethod
+    def count(self):
+        """
+        :rtype: int
+        :return: Amount of records
+        """
+
+    @abstractmethod
+    def create(self, group):
+        """
+        :param group: The group
+        :type group: str
+        :rtype: dict
+        :return: Dictionary containing the BasicAuth description. Example:
+                {
+                    group: "test2"
+                    consumer_id: "abf8f0e5-753b-4eaa-ceff-a7c5187df4ff"
+                    id: "fe575378-162c-4c88-cc35-be456ad8d8a5"
+                    created_at: 1438872669000
+                }
+        """
+
+    @abstractmethod
+    def create_or_update(self, acl_id=None, group=None):
+        """
+        :param acl_id: The unique identifier of the acl info to update
+        :type acl_id: str | uuid.UUID
+        :param group: The group
+        :type group: str
+        :rtype: dict
+        :return: Dictionary containing the Acl description. Example:
+                {
+                    group: "test2"
+                    consumer_id: "abf8f0e5-753b-4eaa-ceff-a7c5187df4ff"
+                    id: "fe575378-162c-4c88-cc35-be456ad8d8a5"
+                    created_at: 1438872669000
+                }
+        """
+
+    @abstractmethod
+    def update(self, acl_id, **fields):
+        """
+        :param acl_id: The unique identifier of the acl info to update
+        :type acl_id: str | uuid.UUID
+        :param fields: Optional dictionary which values will be used to overwrite the existing values
+        :type fields: dict
+        :rtype: dict
+        :return: Dictionary containing the Acl description. Example:
+                {
+                    group: "test2"
+                    consumer_id: "abf8f0e5-753b-4eaa-ceff-a7c5187df4ff"
+                    id: "fe575378-162c-4c88-cc35-be456ad8d8a5"
+                    created_at: 1438872669000
+                }
+        """
+
+    @abstractmethod
+    def retrieve(self, acl_id):
+        """
+        :param acl_id: The unique identifier of the basic_auth info to retrieve
+        :type acl_id: str | uuid.UUID
+        :rtype: dict
+        :return: Dictionary containing the Acl description. Example:
+                {
+                    group: "test2"
+                    consumer_id: "abf8f0e5-753b-4eaa-ceff-a7c5187df4ff"
+                    id: "fe575378-162c-4c88-cc35-be456ad8d8a5"
+                    created_at: 1438872669000
+                }
+        """
+
+    @abstractmethod
+    def list(self, size=100, offset=None, **filter_fields):
+        """
+        :param size: A limit on the number of objects to be returned.
+        :type size: int
+        :param offset: A cursor used for pagination. offset is an object identifier that defines a place in the list.
+        :type offset: uuid.UUID
+        :param filter_fields: Dictionary containing values to filter for
+        :type filter_fields: dict
+        :rtype: dict
+        :return: Dictionary containing dictionaries containing the Acl description. Example:
+                {
+                   "data":[
+                      {
+                         "group":"test2",
+                         "consumer_id":"abf8f0e5-753b-4eaa-ceff-a7c5187df4ff",
+                         "id":"fe575378-162c-4c88-cc35-be456ad8d8a5",
+                         "created_at":1438872669000
+                      },
+                      {
+                         "group":"test",
+                         "consumer_id":"abf8f0e5-753b-4eaa-ceff-a7c5187df4ff",
+                         "id":"da982f37-1d15-4850-c89c-8e238adcb010",
+                         "created_at":1438872620000
+                      }
+                   ]
+                }
+        """
+
+    @abstractmethod
+    def delete(self, acl_id):
+        """
+        :param acl_id: The unique identifier of the acl info to delete
+        :type acl_id: str | uuid.UUID
+        """
+
+
 class ConsumerAdminContract(CollectionMixin):
     __metaclass__ = ABCMeta
 
@@ -866,6 +983,16 @@ class ConsumerAdminContract(CollectionMixin):
 
         :param username_or_id: The unique identifier or the name of the consumer
         :rtype OAuth2AdminContract
+        :return:
+        """
+
+    @abstractmethod
+    def acl(self, username_or_id):
+        """
+        Returns a "Acl" manager for a given consumer
+
+        :param username_or_id: The unique identifier or the name of the consumer
+        :rtype AclAdminContract
         :return:
         """
 
